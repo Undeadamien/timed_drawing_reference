@@ -6,7 +6,7 @@ from PIL import ImageTk, Image
 
 IMAGE_PATH = "images"  # folder where the images should be located, can be modfied
 SLIDE_OFFSET = (0, 80)  # used to adjust the placement of the photo reference
-MAX_SLIDE_SIZE = (300, 500)
+MAX_SLIDE_SIZE = (300, 500)  # maxinum size of the image reference
 
 
 class OptionWindow(Tk):
