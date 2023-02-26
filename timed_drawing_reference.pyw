@@ -4,7 +4,7 @@ from tkinter import Button, Label, Tk
 from PIL import ImageTk, Image
 
 
-IMAGE_PATH = "photos"
+IMAGE_PATH = "images"
 SLIDE_OFFSET = (0, 80)  # used to adjust the placement of the photo reference
 MAX_SLIDE_SIZE = (300, 500)
 
