@@ -1,148 +1,261 @@
+"""
+A little app that pick random picture from a folder and display them for a
+determined time
+"""
+
 from os import listdir
 from random import sample
-from tkinter import Button, Label, Tk
-from PIL import ImageTk, Image
+from tkinter import Button, Canvas, Label, Scale, Tk
 
-# folder where the images should be located, can be modfied
+from PIL import Image, ImageTk
+
+IMAGE_MAX_SIZE = 350, 500
 IMAGE_PATH = "C:\\Users\\Damien\\Desktop\\DRAWING_\\Photo_ref"
-# used to adjust the placement of the photo reference
-SLIDE_OFFSET = (0, 80)
-# maxinum size of the image reference
-MAX_SLIDE_SIZE = (300, 500)
+IMAGE_FILES = [x for x in listdir(IMAGE_PATH)
+               if x.lower().endswith((".jpg", ".png"))]
 
 
-class OptionWindow(Tk):
-
+class SetupWindow(Tk):
+    """This window allows to select how many images to show and for how long"""
     def __init__(self):
-
         super().__init__()
-        self.attributes("-topmost", True)  # keep the fen on top
-        self.overrideredirect(True)  # delete the title bar
-        self.focus_force()
+        self.resizable(False, False)
+        self.attributes("-topmost", True)  # keep the window on top
+        self.overrideredirect(True)
+        self.configure(bg="black",
+                       highlightthickness=2,
+                       highlightbackground="DarkOrange",
+                       highlightcolor="DarkOrange")
 
-        # set available options
-        self.time_duration = [5, 10, 15, 20, 30, 60, 90]  # in minutes
-        self.num_of_slide = [x for x in range(1, 6)]
-
-        # set default choices
-        self.time_choice = 0
-        self.slide_choice = 4
-
-        time_to_show = self.time_duration[self.time_choice]
-        slide_to_show = self.num_of_slide[self.slide_choice]
-
-        self.time_button = Button(self,
-                                  text=f"MINUTES\n{time_to_show}",
-                                  font="arial 16 bold",
-                                  command=lambda: increase_time(self),
-                                  width=10)
-
-        self.slide_button = Button(self,
-                                   text=f"SLIDE\n{slide_to_show}",
-                                   font="arial 16 bold",
-                                   command=lambda: increase_slide(self),
-                                   width=10)
-
+        self.time_slider = Scale(self,
+                                 showvalue=False,
+                                 from_=5,
+                                 to=30,
+                                 tickinterval=5,
+                                 bigincrement=5,
+                                 orient="horizontal",
+                                 font=("Small Fonts", 10, "bold"),
+                                 length=200,
+                                 bg="black",
+                                 fg="white",
+                                 resolution=5,
+                                 highlightthickness=1,
+                                 highlightbackground="DarkOrange",
+                                 border=10)
+        self.image_slider = Scale(self,
+                                  showvalue=False,
+                                  from_=1,
+                                  to=10,
+                                  tickinterval=1,
+                                  orient="horizontal",
+                                  font=("Small Fonts", 10, "bold"),
+                                  length=200,
+                                  bg="black",
+                                  fg="white",
+                                  highlightthickness=1,
+                                  highlightbackground="DarkOrange",
+                                  border=10)
+        self.time_info = Label(self,
+                               text="MINUTES",
+                               font=("Small Fonts", 15, "bold"),
+                               bg="black",
+                               fg="white",
+                               highlightthickness=1,
+                               highlightbackground="DarkOrange",
+                               pady=10)
+        self.image_info = Label(self,
+                                text="IMAGE",
+                                font=("Small Fonts", 15, "bold"),
+                                bg="black",
+                                fg="white",
+                                highlightthickness=1,
+                                highlightbackground="DarkOrange",
+                                pady=10)
         self.confirm_button = Button(self,
                                      text="CONFIRM",
-                                     font="arial 16 bold",
-                                     bg="light green",
-                                     command=lambda: confirm_choice(self),
-                                     width=10)
+                                     font=("Small Fonts", 15, "bold"),
+                                     bg="DarkOrange",
+                                     fg="white",
+                                     relief="groove",
+                                     command=self.confirm)
 
-        # place the button on the window
-        self.time_button.grid(column=0, row=0, sticky="nesw")
-        self.slide_button.grid(column=1, row=0, sticky="nesw")
-        self.confirm_button.grid(columnspan=2, row=1, sticky="nesw")
+        self.time_slider.set(1)
+        self.image_slider.set(4)
 
-        # center the window
-        SCREEN_SIZE = (self.winfo_screenwidth(), self.winfo_screenheight())
-        self.update()
-        self.geometry(f"+{SCREEN_SIZE[0]//2-self.winfo_width()//2}"
-                      + f"+{SCREEN_SIZE[1]//2-self.winfo_height()//2}")
+        self.time_info.grid(row=0, sticky="nesw", )
+        self.time_slider.grid(row=1)
+        self.image_info.grid(row=0, column=1, sticky="nesw")
+        self.image_slider.grid(row=1, column=1)
+        self.confirm_button.grid(row=2, columnspan=2, sticky="nesw")
+        self.recenter()
 
-        def increase_time(self):
-            self.time_choice = (self.time_choice+1) % len(self.time_duration)
-            time_to_show = self.time_duration[self.time_choice]
-            self.time_button.configure(text=f"MINUTES\n{time_to_show}")
+    def recenter(self):
+        """Recenter the window"""
+        screen_size = (self.winfo_screenwidth(), self.winfo_screenheight())
+        self.update()  # the window has to be updated to consider is new size
+        self.geometry(f"+{screen_size[0]//2-self.winfo_width()//2}" +
+                      f"+{screen_size[1]//2-self.winfo_height()//2}")
 
-        def increase_slide(self):
-            self.slide_choice = (self.slide_choice+1) % len(self.num_of_slide)
-            slide_to_show = self.num_of_slide[self.slide_choice]
-            self.slide_button.configure(text=f"SLIDE\n{slide_to_show}")
-
-        def confirm_choice(self):
-            global SELECTED_TIME_OPTIONS, SELECTED_SLIDE_OPTIONS
-
-            # retrieve the selected options before destroying the window
-            SELECTED_TIME_OPTIONS = self.time_duration[self.time_choice] * 60
-            SELECTED_SLIDE_OPTIONS = self.num_of_slide[self.slide_choice]
-            self.destroy()
+    def confirm(self):
+        """Launch the reference window and close the setup window"""
+        # must be in this order
+        time_value = self.time_slider.get()
+        image_value = self.image_slider.get()
+        self.destroy()
+        ReferenceWindow(time_value*60,
+                        sample(IMAGE_FILES, image_value)).mainloop()
 
 
-class SlideWindow(Tk):
-
-    def __init__(self, image_file, time):
-
+class ReferenceWindow(Tk):
+    """This window allows to select how many images to show and for how long"""
+    def __init__(self, time, images):
         super().__init__()
-        self.attributes("-topmost", True)
         self.overrideredirect(True)
+        self.geometry("+0+80")
+        self.attributes("-topmost", True)
         self.focus_force()
-        # adjust the placement of the window
-        self.geometry(f"+{SLIDE_OFFSET[0]}+{SLIDE_OFFSET[1]}")
+
+        self.grid_columnconfigure(1, weight=2)
+
+        self.duration = time
+        self.remaining_time = self.duration
+
+        self.images = self.prepare_image(images)
+        self.current_image = 0
+
+        self.paused = False
+
+        # store Tk.after call from the timer function
+        self.timer_update = None
+
+        # value used during the dragging to keep the cursor
+        # in place relative to the window
+        self.start_x, self.start_y = None, None
+
         self.configure(bg="black",
+                       highlightcolor="black",
                        highlightbackground="black",
                        highlightthickness=2)
+        # place holder for the timer
+        self.timer = Label(self)
+        self.cover = Canvas(self,
+                            bg="gray20",
+                            border=0,
+                            highlightthickness=1,
+                            highlightbackground="black",
+                            highlightcolor="black")
+        self.picture = Label(self,
+                             image=self.images[self.current_image],
+                             highlightbackground="black",
+                             bg="black")
+        self.exit_button = Button(self,
+                                  text="X",
+                                  bg="white",
+                                  fg="black",
+                                  font=("Small Fonts", 10, "bold"),
+                                  highlightcolor="black",
+                                  highlightbackground="white",
+                                  relief="flat",
+                                  height=1,
+                                  width=2,
+                                  command=self.destroy)
+        self.pause_button = Button(self,
+                                   text="II",
+                                   bg="white",
+                                   fg="black",
+                                   font=("Small Fonts", 10, "bold"),
+                                   highlightcolor="black",
+                                   highlightbackground="white",
+                                   relief="flat",
+                                   height=1,
+                                   width=2,
+                                   command=self.pause)
 
-        def prepare_image(image):
+        self.timer.grid(row=0, column=1, sticky="nesw")
+        self.picture.grid(row=1, column=0, columnspan=3)
+        self.pause_button.grid(row=0, column=0, sticky="nesw", pady=2, padx=2)
+        self.exit_button.grid(row=0, column=2, sticky="nesw", pady=2, padx=2)
+
+        # handle the dragging feature
+        self.bind("<ButtonPress-1>", self.start_move)
+        self.bind("<ButtonRelease-1>", self.stop_move)
+        self.bind("<B1-Motion>", self.do_move)
+
+        self.update_clock()  # start the timer
+
+    def prepare_image(self, images):
+        """Convert a list of images into a list of ImageTk.PhotoImage"""
+        prepared_images = []
+        for image in images:
             loaded_image = Image.open(f"{IMAGE_PATH}\\{image}")
             resized_image = loaded_image.resize((loaded_image.size[0]*2,
                                                  loaded_image.size[1]*2))
-            resized_image.thumbnail(MAX_SLIDE_SIZE)
-            return ImageTk.PhotoImage(resized_image)
+            resized_image.thumbnail(IMAGE_MAX_SIZE)
+            prepared_images.append(ImageTk.PhotoImage(resized_image))
+        return prepared_images
 
-        def update_timer(self, time):
-            time -= 1
+    def pause(self):
+        """Allow the user to pause and hide the picture"""
+        self.paused = not self.paused
+        if self.paused:
+            self.after_cancel(self.timer_update)
+            self.cover.configure(height=self.picture.winfo_height()-2,
+                                 width=self.picture.winfo_width()-2)
+            self.picture.grid_forget()
+            self.cover.grid(row=1, column=0, columnspan=3)
+        else:
+            self.picture.grid(row=1, column=0, columnspan=3)
+            self.cover.grid_forget()
+            self.timer_update = self.after(500, self.update_clock)
 
-            if time >= 0:
-                self.after(1000, lambda: update_timer(self, time))
-            else:
-                self.destroy()
+    def next_image(self):
+        """Reset the timer and switch for the next image"""
+        self.current_image += 1
+        if self.current_image <= len(self.images)-1:
+            self.picture.configure(image=self.images[self.current_image])
+            self.after_cancel(self.timer_update)
+            self.remaining_time = self.duration
+            self.update_clock()
+        else:
+            self.destroy()
 
-            self.timer.configure(text=f"{(time//60):02}:{(time%60):02}",
-                                 font="arial 16 bold",
-                                 bg="white",
-                                 highlightbackground="black",
-                                 highlightthickness=2)
+    def update_clock(self):
+        """This function act as a timer, calling it self after 1s"""
+        text = f"{(self.remaining_time//60):02}:{(self.remaining_time%60):02}"
+        self.timer.configure(text=text,
+                             font=("Small Fonts", 15, "bold"),
+                             bg="white",
+                             highlightbackground="black",
+                             highlightthickness=2)
 
-        self.converted_image = prepare_image(image_file)
+        if self.remaining_time >= 0:
+            self.timer_update = self.after(1000, self.update_clock)
+        else:
+            self.next_image()
+        if not self.paused:
+            self.remaining_time -= 1
 
-        self.timer = Label(self,
-                           text="")
-        self.slide = Label(self,
-                           image=self.converted_image,
-                           highlightbackground="black",
-                           bg="black")
+    def start_move(self, event):
+        """Keep the position where the window start moving"""
+        self.start_x, self.start_y = event.x, event.y
 
-        # place the timer and image on the window
-        self.slide.grid(row=1)
-        self.timer.grid(row=0, sticky="nesw")
+    def stop_move(self, _):
+        """Reset start_x and start_y """
+        self.start_x, self.start_y = None, None
 
-        update_timer(self, time+1)  # start the timer
+    def do_move(self, event):
+        """Allow the user to move the window"""
+        self.geometry(f"+{self.winfo_x() + event.x - self.start_x}" +
+                      f"+{self.winfo_y() + event.y - self.start_y}")
 
 
 def main():
-
-    OptionWindow().mainloop()
-
-    # select randomly k number of image from the image folder
-    image_files = [x for x in listdir(IMAGE_PATH)
-                   if x.lower().endswith((".jpg"))]
-
-    SELECTED_IMAGES = sample(image_files, k=SELECTED_SLIDE_OPTIONS)
-
-    for IMAGE in SELECTED_IMAGES:
-        SlideWindow(IMAGE, SELECTED_TIME_OPTIONS).mainloop()
+    """
+    Execute the setup window to define the parameters,
+    then select randomly some images from a folder and finally
+    initialize the reference window
+    """
+    SetupWindow().mainloop()
 
 
 if __name__ == "__main__":
